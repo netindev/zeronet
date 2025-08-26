@@ -37,11 +37,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import tk.netindev.zeronet.ui.theme.ZeronetTheme
+import tk.netindev.zeronet.tunnel.TunnelManager
+import tk.netindev.zeronet.tunnel.TunnelService
+import tk.netindev.zeronet.tunnel.PayloadConfig
+import android.net.VpnService
+import android.content.Intent
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : ComponentActivity() {
+    private lateinit var tunnelManager: TunnelManager
+    
+    private val vpnPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            startTunnelWithPayload()
+        }
+    }
+    
+    private var selectedPayloadForTunnel: String? = null
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        tunnelManager = TunnelManager(this)
+        
         setContent {
             ZeronetTheme {
                 Surface(
@@ -55,17 +76,50 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                             .background(MaterialTheme.colorScheme.background)
                     ) {
-                        ZeronetApp()
+                        ZeronetApp(
+                            tunnelManager = tunnelManager,
+                            onStartTunnel = { selectedPayload -> requestVpnPermission(selectedPayload) },
+                            onStopTunnel = { stopTunnel() }
+                        )
                     }
                 }
             }
         }
     }
+    
+    private fun requestVpnPermission(payloadName: String) {
+        selectedPayloadForTunnel = payloadName
+        val intent = VpnService.prepare(this)
+        if (intent != null) {
+            vpnPermissionLauncher.launch(intent)
+        } else {
+            startTunnelWithPayload()
+        }
+    }
+    
+    private fun startTunnelWithPayload() {
+        selectedPayloadForTunnel?.let { payloadName ->
+            val payloadInfo = PayloadConfig.getPayloadByName(payloadName)
+            if (payloadInfo != null) {
+                TunnelService.startService(this)
+                tunnelManager.startTunnelWithPayload(payloadInfo.payload)
+            }
+        }
+    }
+    
+    private fun stopTunnel() {
+        tunnelManager.stopTunnel()
+        TunnelService.stopService(this)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ZeronetApp() {
+fun ZeronetApp(
+    tunnelManager: TunnelManager,
+    onStartTunnel: (String) -> Unit,
+    onStopTunnel: () -> Unit
+) {
     var selectedOperator by remember { mutableStateOf("") }
     var selectedPayload by remember { mutableStateOf("") }
     var isLogVisible by remember { mutableStateOf(false) }
@@ -77,7 +131,35 @@ fun ZeronetApp() {
     var autoTimAds by remember { mutableStateOf(false) }
     
     val operators = listOf("TIM", "VIVO", "CLARO")
-    val payloads = listOf("Payload A", "Payload B", "Payload C", "Payload D")
+    val payloads = PayloadConfig.payloads.map { it.name }
+    
+    // Observe tunnel logs
+    LaunchedEffect(Unit) {
+        tunnelManager.logMessages.collect { tunnelLogs ->
+            logMessages = tunnelLogs
+        }
+    }
+    
+    // Observe tunnel state
+    LaunchedEffect(Unit) {
+        tunnelManager.connectionState.collect { state ->
+            when (state) {
+                TunnelManager.ConnectionState.CONNECTED -> {
+                    isRunning = true
+                    logMessages = logMessages + "Tunnel connected successfully!"
+                }
+                TunnelManager.ConnectionState.DISCONNECTED -> {
+                    isRunning = false
+                    logMessages = logMessages + "Tunnel disconnected"
+                }
+                TunnelManager.ConnectionState.ERROR -> {
+                    isRunning = false
+                    logMessages = logMessages + "Tunnel error occurred"
+                }
+                else -> { /* Other states */ }
+            }
+        }
+    }
     
     Box(
         modifier = Modifier
@@ -173,7 +255,7 @@ fun ZeronetApp() {
                         },
                         onClick = { 
                             selectedOperator = operator
-                            operatorExpanded = falsex
+                            operatorExpanded = false
                         }
                     )
                 }
@@ -271,18 +353,24 @@ fun ZeronetApp() {
         Button(
             onClick = {
                 if (!isRunning) {
-                    val timAdsStatus = if (selectedOperator == "TIM" && autoTimAds) ", Auto TIM Ads: ON" else ""
-                    val message = "Started with MVNO: $selectedOperator, Payload: $selectedPayload$timAdsStatus"
-                    logMessages = logMessages + message
-                    logMessages = logMessages + "Operation is now running..."
-                    logMessages = logMessages + "Processing data..."
-                    isLogVisible = true
-                    isRunning = true
+                    if (selectedOperator.isNotEmpty() && selectedPayload.isNotEmpty()) {
+                        val timAdsStatus = if (selectedOperator == "TIM" && autoTimAds) ", Auto TIM Ads: ON" else ""
+                        val message = "Started with MVNO: $selectedOperator, Payload: $selectedPayload$timAdsStatus"
+                        logMessages = logMessages + message
+                        logMessages = logMessages + "Operation is now running..."
+                        logMessages = logMessages + "Processing data..."
+                        isLogVisible = true
+                        isRunning = true
+                        onStartTunnel(selectedPayload)
+                    } else {
+                        logMessages = logMessages + "Please select operator and payload"
+                    }
                 } else {
                     val message = "Stopping operation..."
                     logMessages = logMessages + message
                     logMessages = logMessages + "Operation stopped"
                     isRunning = false
+                    onStopTunnel()
                 }
             },
             modifier = Modifier
@@ -407,4 +495,5 @@ fun ZeronetApp() {
         }
     }
 }
+
 
