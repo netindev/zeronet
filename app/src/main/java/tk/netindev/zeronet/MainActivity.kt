@@ -125,7 +125,7 @@ fun ZeronetApp() {
         
         // Operator Dropdown
         Text(
-            text = "MVNO",
+            text = "MNO",
             fontSize = 16.sp,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onBackground,
@@ -173,7 +173,7 @@ fun ZeronetApp() {
                         },
                         onClick = { 
                             selectedOperator = operator
-                            operatorExpanded = false
+                            operatorExpanded = falsex
                         }
                     )
                 }
