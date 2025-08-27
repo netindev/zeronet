@@ -1,7 +1,9 @@
 package tk.netindev.zeronet.tunnel
 
 import android.content.Context
+import android.content.Intent
 import android.net.VpnService
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.*
 import java.net.InetSocketAddress
@@ -66,6 +68,9 @@ class VpnService(private val context: Context) {
 // Extension class for actual VPN service implementation
 class ZeroNetVpnService : android.net.VpnService() {
     private val TAG = "ZeroNetVpnService"
+    private var vpnInterface: ParcelFileDescriptor? = null
+    private var vpnTunnel: VpnTunnel? = null
+    private var tunnelSocket: Socket? = null
     
     companion object {
         private var instance: ZeroNetVpnService? = null
@@ -79,18 +84,83 @@ class ZeroNetVpnService : android.net.VpnService() {
         Log.d(TAG, "ZeroNet VPN Service created")
     }
     
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "ZeroNet VPN Service started with startId: $startId")
+        return START_STICKY
+    }
+    
     override fun onDestroy() {
         super.onDestroy()
         instance = null
         Log.d(TAG, "ZeroNet VPN Service destroyed")
     }
     
+
+    
     fun createVpnInterface(): android.net.VpnService.Builder? {
-        return Builder()
-            .setSession("ZeroNet")
-            .addAddress("10.0.0.2", 32)
-            .addDnsServer("8.8.8.8")
-            .addRoute("0.0.0.0", 0)
-            .setMtu(1500)
+        return try {
+            Builder()
+                .setSession("ZeroNet")
+                .addAddress("10.0.0.2", 32)
+                .addDnsServer("8.8.8.8")
+                .addDnsServer("1.1.1.1")
+                .addRoute("0.0.0.0", 0)
+                .setMtu(1500)
+                .setBlocking(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creating VPN interface: ${e.message}")
+            null
+        }
+    }
+    
+    fun establishVpn(
+        tunnelSocket: Socket, 
+        websocketConnection: WebSocketConnection, 
+        sshConnection: SSHConnection, 
+        onLogMessage: (String) -> Unit
+    ): Boolean {
+        return try {
+            this.tunnelSocket = tunnelSocket
+            
+            val builder = createVpnInterface()
+            if (builder != null) {
+                vpnInterface = builder.establish()
+                if (vpnInterface != null) {
+                    Log.d(TAG, "VPN interface established successfully")
+                    
+                    // Start VPN tunnel routing with SSH and WebSocket connections
+                    vpnTunnel = VpnTunnel(vpnInterface!!, tunnelSocket, websocketConnection, sshConnection, onLogMessage)
+                    vpnTunnel?.start()
+                    
+                    true
+                } else {
+                    Log.e(TAG, "Failed to establish VPN interface")
+                    false
+                }
+            } else {
+                Log.e(TAG, "Failed to create VPN builder")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error establishing VPN: ${e.message}")
+            false
+        }
+    }
+    
+    fun stopVpn() {
+        try {
+            vpnTunnel?.stop()
+            vpnTunnel = null
+            
+            vpnInterface?.close()
+            vpnInterface = null
+            
+            tunnelSocket?.close()
+            tunnelSocket = null
+            
+            Log.d(TAG, "VPN interface closed")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping VPN: ${e.message}")
+        }
     }
 }

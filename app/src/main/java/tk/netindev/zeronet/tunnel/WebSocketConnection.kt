@@ -50,12 +50,28 @@ class WebSocketConnection(private val socket: Socket) {
         }
         
         try {
-            // Read WebSocket frame
-            return readWebSocketFrame()
+            // Read WebSocket frame with timeout
+            return readWebSocketFrameWithTimeout(1000)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to receive WebSocket data", e)
             return null
         }
+    }
+    
+    private fun readWebSocketFrameWithTimeout(timeoutMs: Long): ByteArray? {
+        val startTime = System.currentTimeMillis()
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            try {
+                val frame = readWebSocketFrame()
+                if (frame != null && frame.isNotEmpty()) {
+                    return frame
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "No data available yet: ${e.message}")
+            }
+            Thread.sleep(50)
+        }
+        return null
     }
     
     private fun createWebSocketFrame(data: ByteArray): ByteArray {

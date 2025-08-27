@@ -40,6 +40,9 @@ class TunnelService : Service() {
         
         tunnelManager = TunnelManager(this)
         createNotificationChannel()
+        
+        // Initialize VPN service
+        Log.d(TAG, "Initializing VPN service")
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

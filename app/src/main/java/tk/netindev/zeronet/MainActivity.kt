@@ -40,8 +40,10 @@ import tk.netindev.zeronet.ui.theme.ZeronetTheme
 import tk.netindev.zeronet.tunnel.TunnelManager
 import tk.netindev.zeronet.tunnel.TunnelService
 import tk.netindev.zeronet.tunnel.PayloadConfig
+import tk.netindev.zeronet.tunnel.ZeroNetVpnService
 import android.net.VpnService
 import android.content.Intent
+import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : ComponentActivity() {
@@ -101,9 +103,24 @@ class MainActivity : ComponentActivity() {
         selectedPayloadForTunnel?.let { payloadName ->
             val payloadInfo = PayloadConfig.getPayloadByName(payloadName)
             if (payloadInfo != null) {
+                // Start the tunnel service first
                 TunnelService.startService(this)
+                
+                // Start the VPN service
+                startVpnService()
+                
+                // Start the tunnel manager
                 tunnelManager.startTunnelWithPayload(payloadInfo.payload)
             }
+        }
+    }
+    
+    private fun startVpnService() {
+        try {
+            val intent = Intent(this, ZeroNetVpnService::class.java)
+            startService(intent)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to start VPN service: ${e.message}")
         }
     }
     
