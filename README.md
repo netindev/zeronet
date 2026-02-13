@@ -4,11 +4,11 @@
 
 ## O que é?
 
-Um app que tunela internet por fora usando websites zero-rated da operadora a fim de obter internet ilimitada e gratuita (mesmo sem cŕedito/dados)
+Um app que tunela internet por fora usando websites zero-rated da operadora a fim de obter internet ilimitada e gratuita (mesmo sem crédito/dados)
 
 ## TODO
 
-- [ ] Adicionar suporte TLS
+- [X] Adicionar suporte TLS
 - [ ] Adicionar suporte V2ray
 - [ ] Adicionar suporte SlowDNS
 - [ ] Adicionar suporte Ads Auto-bot

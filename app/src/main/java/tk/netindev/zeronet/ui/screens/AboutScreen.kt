@@ -210,8 +210,28 @@ fun AboutContent() {
     }
 }
 
+private data class LibraryLicense(val name: String, val license: String)
+
 @Composable
 fun LicensesContent() {
+    val libraries = listOf(
+        LibraryLicense("AndroidX Core KTX", "Apache License 2.0"),
+        LibraryLicense("AndroidX Lifecycle Runtime", "Apache License 2.0"),
+        LibraryLicense("AndroidX Activity Compose", "Apache License 2.0"),
+        LibraryLicense("AndroidX Compose BOM", "Apache License 2.0"),
+        LibraryLicense("AndroidX Compose UI", "Apache License 2.0"),
+        LibraryLicense("Material Design 3", "Apache License 2.0"),
+        LibraryLicense("Material Icons Extended", "Apache License 2.0"),
+        LibraryLicense("Kotlinx Coroutines Android", "Apache License 2.0"),
+        LibraryLicense("OkHttp", "Apache License 2.0"),
+        LibraryLicense("JBCrypt (ConnectBot)", "ISC License"),
+        LibraryLicense("EdDSA (net.i2p.crypto)", "CC0 1.0 Universal (Public Domain)"),
+        LibraryLicense("AndroidX LocalBroadcastManager", "Apache License 2.0"),
+        LibraryLicense("AndroidX AppCompat", "Apache License 2.0"),
+        LibraryLicense("AndroidX Legacy Support v4", "Apache License 2.0"),
+        LibraryLicense("Trilead SSH-2 for Java", "BSD-3-Clause (Trilead)"),
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -227,7 +247,7 @@ fun LicensesContent() {
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
                     text = "Open Source Libraries",
@@ -237,47 +257,23 @@ fun LicensesContent() {
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                 )
 
-                Text(
-                    text = "Compose BOM",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-                Text(
-                    text = "Apache License 2.0",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-
-                Text(
-                    text = "Material Design 3",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-                Text(
-                    text = "Apache License 2.0",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-
-                Text(
-                    text = "Kotlinx Coroutines",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-                Text(
-                    text = "Apache License 2.0",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
+                libraries.forEach { lib ->
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = lib.name,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                        Text(
+                            text = lib.license,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                        )
+                    }
+                }
             }
         }
 

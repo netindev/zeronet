@@ -23,6 +23,8 @@ fun PayloadConfigCard(
     onRemoteProxyClick: () -> Unit,
     tunnelType: String,
     onTunnelTypeChange: (String) -> Unit,
+    sniHost: String = "",
+    onSniHostChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -50,7 +52,9 @@ fun PayloadConfigCard(
                 remoteProxyConfig = remoteProxyConfig,
                 onRemoteProxyClick = onRemoteProxyClick,
                 tunnelType = tunnelType,
-                onTunnelTypeChange = onTunnelTypeChange
+                onTunnelTypeChange = onTunnelTypeChange,
+                sniHost = sniHost,
+                onSniHostChange = onSniHostChange
             )
         }
     }

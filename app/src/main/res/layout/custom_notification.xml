@@ -101,7 +101,7 @@
             </LinearLayout>
 
             <!-- Divider -->
-            <View
+            <TextView
                 android:layout_width="1dp"
                 android:layout_height="24dp"
                 android:background="#37474F"

@@ -28,6 +28,7 @@ import tk.netindev.zeronet.service.util.ConnectionStatus
 import tk.netindev.zeronet.service.util.ConnectionStatusManager.setStatus
 import tk.netindev.zeronet.vpn.ZeroNetService
 import tk.netindev.zeronet.vpn.methods.HttpSSHProxy
+import tk.netindev.zeronet.vpn.methods.SSLTunnelProxy
 import tk.netindev.zeronet.vpn.tunnel.TunnelState.Companion.tunnelState
 import tk.netindev.zeronet.vpn.util.NetworkUtils
 import java.io.File
@@ -469,6 +470,7 @@ open class TunnelManagerThread
             when (proxyType) {
                 "SSH_DIRECT" -> configureSSHDirectProxy(customPayload, connection)
                 "SSH_PROXY" -> configureSSHProxyProxy(customPayload, payloadItem, connection)
+                "SSH_SSL_TUNNEL" -> configureSSLTunnelProxy(customPayload, payloadItem, connection)
                 else -> {
                     w(TAG, "Unknown proxy type: $proxyType, using direct connection")
                     this.useProxy = false
@@ -524,6 +526,35 @@ open class TunnelManagerThread
         val proxyData: ProxyData = HttpSSHProxy(proxyHost, proxyPort, null, null, customPayload)
         conn.setProxyData(proxyData)
         i(TAG, "SSH Proxy configured: $proxyHost:$proxyPort")
+    }
+
+    @Throws(Exception::class)
+    private fun configureSSLTunnelProxy(
+        customPayload: String?, payloadItem: PayloadItem,
+        conn: Connection
+    ) {
+        var payload = customPayload
+        if (payload != null && payload.trim().isEmpty()) {
+            payload = null
+        }
+
+        val proxyHost = payloadItem.proxyHost
+        val proxyPort = payloadItem.proxyPort
+        if (proxyHost.trim().isEmpty()) {
+            throw Exception("Proxy host not configured in payload item for SSL tunnel")
+        }
+        if (proxyPort !in 1..65535) {
+            throw Exception("Invalid proxy port in payload item: $proxyPort")
+        }
+
+        val sniHost = settings.getString(Settings.SSL_SNI_HOST_KEY)
+
+        val proxyData: ProxyData = SSLTunnelProxy(
+            proxyHost, proxyPort, null, null, payload,
+            sniHost.ifBlank { null }
+        )
+        conn.setProxyData(proxyData)
+        i(TAG, "SSL Tunnel proxy configured: $proxyHost:$proxyPort, SNI: ${sniHost.ifBlank { "(default)" }}")
     }
 
     @Synchronized

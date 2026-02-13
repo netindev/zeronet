@@ -17,7 +17,14 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
+import android.content.Context
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.telephony.TelephonyManager
+import androidx.core.content.ContextCompat
 
 import tk.netindev.zeronet.service.util.ConnectionStatus
 
@@ -248,5 +255,120 @@ fun ConnectionStatusBadge(
                 fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
             )
         }
+    }
+}
+
+@Composable
+fun NetworkTypeBadge(
+    onRequestPhoneStatePermission: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var networkType by remember { mutableStateOf("") }
+    var hasRequestedPhoneState by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            networkType = getNetworkType(context)
+            kotlinx.coroutines.delay(3000)
+        }
+    }
+
+    // When on cellular and we only show "Mobile" due to missing permission, request once
+    LaunchedEffect(networkType, hasRequestedPhoneState) {
+        if (
+            networkType == "Mobile" &&
+            !hasRequestedPhoneState &&
+            onRequestPhoneStatePermission != null &&
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            hasRequestedPhoneState = true
+            onRequestPhoneStatePermission()
+        }
+    }
+
+    if (networkType.isNotEmpty()) {
+        val color = when {
+            networkType == "WiFi" -> Color(0xFF2196F3)
+            networkType == "5G" -> Color(0xFF00E676)
+            networkType == "4G" -> Color(0xFF4CAF50)
+            networkType == "5G/4G" -> Color(0xFF4CAF50)
+            networkType == "3G" -> Color(0xFFFF9800)
+            networkType == "2G" -> Color(0xFFF44336)
+            networkType == "Ethernet" -> Color(0xFF9C27B0)
+            else -> Color(0xFF757575) // Mobile or unknown
+        }
+
+        Surface(
+            modifier = modifier,
+            shape = RoundedCornerShape(16.dp),
+            color = color.copy(alpha = 0.1f)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(color = color, radius = size.minDimension / 2)
+                    }
+                }
+
+                Text(
+                    text = networkType,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = color,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+        }
+    }
+}
+
+private fun getNetworkType(context: Context): String {
+    val connectivityManager =
+        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val network = connectivityManager.activeNetwork ?: return ""
+    val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return ""
+
+    return when {
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WiFi"
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
+            if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+                return "Mobile"
+            }
+            try {
+                val telephonyManager =
+                    context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+                @Suppress("DEPRECATION")
+                when (telephonyManager.dataNetworkType) {
+                    TelephonyManager.NETWORK_TYPE_NR -> "5G"
+                    TelephonyManager.NETWORK_TYPE_LTE -> "5G/4G"
+                    TelephonyManager.NETWORK_TYPE_HSDPA,
+                    TelephonyManager.NETWORK_TYPE_HSUPA,
+                    TelephonyManager.NETWORK_TYPE_HSPA,
+                    TelephonyManager.NETWORK_TYPE_HSPAP,
+                    TelephonyManager.NETWORK_TYPE_UMTS,
+                    TelephonyManager.NETWORK_TYPE_EVDO_0,
+                    TelephonyManager.NETWORK_TYPE_EVDO_A,
+                    TelephonyManager.NETWORK_TYPE_EVDO_B -> "3G"
+                    TelephonyManager.NETWORK_TYPE_GPRS,
+                    TelephonyManager.NETWORK_TYPE_EDGE,
+                    TelephonyManager.NETWORK_TYPE_CDMA,
+                    TelephonyManager.NETWORK_TYPE_1xRTT -> "2G"
+                    else -> "Mobile"
+                }
+            } catch (_: Throwable) {
+                "Mobile"
+            }
+        }
+        capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
+        else -> ""
     }
 }

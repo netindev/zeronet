@@ -41,6 +41,9 @@ class Settings(context: Context) {
         const val UDPRESOLVER_KEY = "udpresolver"
         const val KEYPATH_KEY = "keyPath"
 
+        const val SSL_SNI_HOST_KEY = "sslSniHost"
+        const val SSL_PORT_KEY = "sslPort"
+
         const val MNO_FREE_INTERNET_OPERATOR_KEY = "mnoFreeInternetOperator"
         const val MNO_FREE_INTERNET_HOST_KEY = "mnoFreeInternetHost"
         const val MNO_FREE_INTERNET_PORT_KEY = "mnoFreeInternetPort"
@@ -65,6 +68,8 @@ class Settings(context: Context) {
             SSH_PING_INTERVAL_KEY -> "30"
             CUSTOM_PAYLOAD_ENABLED_KEY -> "false"
             LAST_CONFIG_IS_PREDEFINED_KEY -> "true"
+            SSL_SNI_HOST_KEY -> ""
+            SSL_PORT_KEY -> "443"
             MNO_FREE_INTERNET_OPERATOR_KEY -> "TIM"
             MNO_FREE_INTERNET_HOST_KEY -> ""
             MNO_FREE_INTERNET_PORT_KEY -> "8080"

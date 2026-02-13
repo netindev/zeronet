@@ -32,6 +32,7 @@ import tk.netindev.zeronet.service.util.AppLog.i
 import tk.netindev.zeronet.service.util.AppLog.w
 import tk.netindev.zeronet.service.util.ConnectionStatus
 import tk.netindev.zeronet.service.util.ConnectionStatusManager
+import tk.netindev.zeronet.service.util.ConnectionStatsManager
 import tk.netindev.zeronet.service.util.ConnectionStatusManager.setStatus
 import tk.netindev.zeronet.service.util.SpeedMonitor
 import tk.netindev.zeronet.vpn.tunnel.TunnelManagerThread
@@ -64,6 +65,14 @@ class ZeroNetService : Service() {
             object : SpeedMonitor.SpeedUpdateCallback {
                 override fun onSpeedUpdate(uploadKbps: Double, downloadKbps: Double) {
                     this@ZeroNetService.updateNotificationWithStats()
+                    val session = this@ZeroNetService.speedMonitor?.sessionStats
+                    if (session != null) {
+                        ConnectionStatsManager.setSessionStats(
+                            session.durationSeconds,
+                            session.downloadBytes,
+                            session.uploadBytes
+                        )
+                    }
                 }
             },
             this

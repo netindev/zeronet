@@ -88,8 +88,9 @@ class SpeedMonitor(
 
             val sessionDuration =
                 (System.currentTimeMillis() - connectionStartTime) / 1000
-            val sessionDownload = max(0, currentRx - initialRxBytes)
-            val sessionUpload = max(0, currentTx - initialTxBytes)
+            // Halve to compensate for VPN double-counting on tun0 + real interface
+            val sessionDownload = max(0, currentRx - initialRxBytes) / 2
+            val sessionUpload = max(0, currentTx - initialTxBytes) / 2
 
             return SessionStats(sessionDuration, sessionDownload, sessionUpload)
         }
@@ -143,8 +144,10 @@ class SpeedMonitor(
 
                     if (dRx >= 0 && dTx >= 0 && dt > 0) {
                         val secs = dt / 1000.0
-                        val downKbps = (dRx * 8.0) / (secs * 1000.0)
-                        val upKbps = (dTx * 8.0) / (secs * 1000.0)
+                        // Android counts VPN UID traffic on BOTH tun0 and the real interface,
+                        // effectively doubling the reported bytes. Halve to compensate.
+                        val downKbps = (dRx * 8.0) / (secs * 1000.0) / 2.0
+                        val upKbps = (dTx * 8.0) / (secs * 1000.0) / 2.0
 
                         pushRolling(lastDownKbps, downKbps)
                         pushRolling(lastUpKbps, upKbps)

@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -108,14 +106,11 @@ fun LogViewer(
         }
     }
 
-    val titleHeight = 56.dp
-    val minHeight = (screenHeight * 0.25f)
-    val maxHeight = (screenHeight * 0.85f)
-    
-    var currentHeight by remember { mutableStateOf((screenHeight * 0.28f).value) }
+    val collapsedHeight = 80.dp
+    val expandedHeight = (screenHeight * 0.70f)
     
     val animatedHeight by animateFloatAsState(
-        targetValue = if (isExpanded) currentHeight else titleHeight.value,
+        targetValue = if (isExpanded) expandedHeight.value else collapsedHeight.value,
         animationSpec = tween(300),
         label = "height_animation"
     )
@@ -139,19 +134,6 @@ fun LogViewer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragEnd = {}
-                        ) { change, _ ->
-                            if (isExpanded) {
-                                val newHeight = (currentHeight - change.position.y / 3f).coerceIn(
-                                    minHeight.value,
-                                    maxHeight.value
-                                )
-                                currentHeight = newHeight
-                            }
-                        }
-                    }
                     .clickable { isExpanded = !isExpanded },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -208,9 +190,17 @@ fun LogViewer(
                 }
             }
 
-            if (isExpanded) {
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
+            if (!isExpanded) {
+                // Show last log entry when collapsed for quick glance
+                val lastLog = logs.filter { enabledLogLevels.contains(it.level) }.lastOrNull()
+                if (lastLog != null) {
+                    LogEntryItem(logEntry = lastLog)
+                }
+            }
+
+            if (isExpanded) {
                 if (logs.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxSize(),

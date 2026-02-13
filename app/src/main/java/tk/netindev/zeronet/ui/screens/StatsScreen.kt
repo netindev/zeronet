@@ -28,6 +28,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import tk.netindev.zeronet.service.config.Settings
+import tk.netindev.zeronet.service.util.ConnectionStatsManager
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -52,11 +53,32 @@ fun StatsScreen(
     var isTestingConnection by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        totalUptime = settings.getTotalUptimeSeconds()
-        totalDownload = settings.getTotalDownloadBytes()
-        totalUpload = settings.getTotalUploadBytes()
         isBatteryOptimized = isBatteryOptimizationDisabled(context)
     }
+
+    // Persisted totals from Settings (saved when connection ends)
+    var persistedUptime by remember { mutableStateOf(settings.getTotalUptimeSeconds()) }
+    var persistedDownload by remember { mutableStateOf(settings.getTotalDownloadBytes()) }
+    var persistedUpload by remember { mutableStateOf(settings.getTotalUploadBytes()) }
+
+    // Live session stats from ConnectionStatsManager (updated every second while connected)
+    val liveStats by ConnectionStatsManager.stats.collectAsState(initial = ConnectionStatsManager.Stats())
+
+    // Poll Settings every second so we see updated totals after connection ends
+    LaunchedEffect(Unit) {
+        while (true) {
+            persistedUptime = settings.getTotalUptimeSeconds()
+            persistedDownload = settings.getTotalDownloadBytes()
+            persistedUpload = settings.getTotalUploadBytes()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
+    // Display = persisted + current session when connected (connectedSinceEpochMs > 0)
+    val isConnected = liveStats.connectedSinceEpochMs > 0L
+    totalUptime = persistedUptime + if (isConnected) liveStats.sessionDurationSeconds else 0L
+    totalDownload = persistedDownload + if (isConnected) liveStats.sessionDownloadBytes else 0L
+    totalUpload = persistedUpload + if (isConnected) liveStats.sessionUploadBytes else 0L
     
     Column(
         modifier = Modifier

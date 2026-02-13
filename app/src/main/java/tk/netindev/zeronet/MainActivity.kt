@@ -22,6 +22,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,6 +84,7 @@ import tk.netindev.zeronet.service.util.AppLog
 import tk.netindev.zeronet.service.util.ConnectionStatus
 import tk.netindev.zeronet.service.util.ConnectionStatusManager
 import tk.netindev.zeronet.ui.components.ConnectionStatusBadge
+import tk.netindev.zeronet.ui.components.NetworkTypeBadge
 import tk.netindev.zeronet.ui.components.ConnectionStatsCard
 import tk.netindev.zeronet.ui.components.OperatorConfigCard
 import tk.netindev.zeronet.ui.components.PayloadConfigCard
@@ -108,6 +111,10 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    val phoneStatePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ -> }
 
     private var selectedPayloadForTunnel: String? = null
     private var selectedOperatorForTunnel: String? = null
@@ -136,7 +143,10 @@ class MainActivity : ComponentActivity() {
                                 requestVpnPermission(selectedPayload, selectedOperator)
                             },
                             onStopTunnel = { stopTunnel() },
-                            context = this@MainActivity
+                            context = this@MainActivity,
+                            onRequestPhoneStatePermission = {
+                                phoneStatePermissionLauncher.launch(android.Manifest.permission.READ_PHONE_STATE)
+                            }
                         )
                     }
                 }
@@ -200,6 +210,7 @@ fun ZeronetApp(
     onStartTunnel: (String, String) -> Unit,
     onStopTunnel: () -> Unit,
     context: android.content.Context,
+    onRequestPhoneStatePermission: () -> Unit = {},
 ) {
     var isRunning by remember { mutableStateOf(false) }
     var connectionStatus by remember { mutableStateOf(ConnectionStatus.LEVEL_NOT_CONNECTED) }
@@ -219,6 +230,7 @@ fun ZeronetApp(
     var showConnectionStatusModal by remember { mutableStateOf(false) }
     var showConnectionInfoModal by remember { mutableStateOf(false) }
     var tunnelType by remember { mutableStateOf("SSH_DIRECT") }
+    var sniHost by remember { mutableStateOf("") }
 
     var avgUploadKbps by remember { mutableStateOf(0.0) }
     var avgDownloadKbps by remember { mutableStateOf(0.0) }
@@ -274,6 +286,7 @@ fun ZeronetApp(
                 isRunning = status == ConnectionStatus.LEVEL_CONNECTED || status == ConnectionStatus.LEVEL_CONNECTING_NO_SERVER_REPLY_YET || status == ConnectionStatus.LEVEL_CONNECTING_SERVER_REPLIED || status == ConnectionStatus.LEVEL_START
                 if (status == ConnectionStatus.LEVEL_CONNECTED && connectedSince == 0L) {
                     connectedSince = System.currentTimeMillis()
+                    tk.netindev.zeronet.service.util.ConnectionStatsManager.setConnectedSince(connectedSince)
                 }
                 if (status == ConnectionStatus.LEVEL_NOT_CONNECTED) {
                     connectedSince = 0L
@@ -289,6 +302,8 @@ fun ZeronetApp(
                     geoStatus = ""
                     pingMs = -1L
                     uptimeText = "--:--:--"
+                    // Clear the global stats singleton so stale data doesn't persist
+                    tk.netindev.zeronet.service.util.ConnectionStatsManager.reset()
                 }
             }
         }
@@ -317,7 +332,12 @@ fun ZeronetApp(
         val hasProxyConfigured = proxyHost.isNotEmpty() && proxyPort > 0
 
         val savedTunnelType = settings.getString(Settings.TUNNEL_TYPE_KEY, "SSH_DIRECT")
-        tunnelType = if (hasProxyConfigured) "SSH_PROXY" else "SSH_DIRECT"
+        tunnelType = when (savedTunnelType) {
+            "SSH_SSL_TUNNEL" -> "SSH_SSL_TUNNEL"
+            "SSH_PROXY" -> if (hasProxyConfigured) "SSH_PROXY" else "SSH_DIRECT"
+            else -> if (hasProxyConfigured) "SSH_PROXY" else "SSH_DIRECT"
+        }
+        sniHost = settings.getString(Settings.SSL_SNI_HOST_KEY, "")
 
         if (savedTunnelType != tunnelType) {
             settings.setString(Settings.TUNNEL_TYPE_KEY, tunnelType)
@@ -509,269 +529,290 @@ fun ZeronetApp(
                         .padding(12.dp)
                 ) {
                     Column(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(top = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        ConnectionStatusBadge(
-                            status = connectionStatus,
-                            onClick = { showConnectionStatusModal = true }
-                        )
-                        
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-
-                        IconButton(
-                            onClick = { showSshConfigScreen = true }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "SSH Configuration",
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { showSettingsScreen = true }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
-
-                        MenuDropdown(
-                            onPresetsClick = { showConfigManagerScreen = true },
-                            onStatsClick = { showStatsScreen = true },
-                            onTweaksClick = { showTweaksScreen = true },
-                            onAboutClick = { showAboutScreen = true },
-                            onExitClick = {
-                                android.os.Process.killProcess(android.os.Process.myPid())
-                            }
-                        )
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.TopCenter)
-                            .padding(top = 60.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            val rotation by animateFloatAsState(
-                                targetValue = if (isAnimating) 360f else 0f,
-                                animationSpec = spring(
-                                    dampingRatio = 0.6f,
-                                    stiffness = 100f
-                                ),
-                                label = "rotation"
-                            )
-                            
-                            val scale by animateFloatAsState(
-                                targetValue = if (isAnimating) 1.2f else 1f,
-                                animationSpec = spring(
-                                    dampingRatio = 0.6f,
-                                    stiffness = 100f
-                                ),
-                                label = "scale"
-                            )
-                            
-                            Icon(
-                                painter = painterResource(id = R.mipmap.ic_launcher_foreground),
-                                contentDescription = "App Icon",
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .clickable(
-                                        indication = null,
-                                        interactionSource = remember { MutableInteractionSource() }
-                                    ) { handleLogoClick() }
-                                    .rotate(rotation)
-                                    .scale(scale),
-                                tint = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "ZeroNet",
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                            )
-                            Text(
-                                text = "by netindev",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        if (connectionStatus == ConnectionStatus.LEVEL_NOT_CONNECTED) {
-                            OperatorConfigCard(
-                                selectedOperator = selectedOperator,
-                                operators = operators,
-                                onOperatorSelected = { operator ->
-                                    selectedOperator = operator
-                                    selectedPayload = ""
-                                    val settings = Settings(context)
-                                    settings.setString(Settings.OPERATOR_KEY, operator)
-                                    settings.setString(Settings.PAYLOAD_KEY, "")
-                                    settings.setLastConfigIsPredefined(true)
-                                    isCustomPayloadEnabled = false
-                                },
-                                isCustomPayloadEnabled = isCustomPayloadEnabled,
-                                onCustomPayloadToggle = { enabled ->
-                                    isCustomPayloadEnabled = enabled
-                                    val settings = Settings(context)
-                                    settings.setCustomPayloadEnabled(enabled)
-                                    if (enabled) {
-                                        selectedPayload = ""
-                                        settings.setString(Settings.CUSTOM_PAYLOAD_KEY, customPayloadText)
-                                        settings.setLastConfigIsPredefined(false)
-                                    } else {
-                                        settings.setString(Settings.PAYLOAD_KEY, selectedPayload)
-                                        settings.setLastConfigIsPredefined(true)
-                                    }
-                                }
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-
-                            PayloadConfigCard(
-                                isCustomPayloadEnabled = isCustomPayloadEnabled,
-                                selectedPayload = selectedPayload,
-                                availablePayloads = availablePayloads,
-                                onPayloadSelected = {
-                                    selectedPayload = it
-                                    val settings = Settings(context)
-                                    settings.setString(Settings.PAYLOAD_KEY, it)
-                                    settings.setLastConfigIsPredefined(true)
-                                },
-                                customPayloadText = customPayloadText,
-                                onCustomPayloadTextChange = {
-                                    customPayloadText = it
-                                    if (isCustomPayloadEnabled) {
-                                        val settings = Settings(context)
-                                        settings.setString(Settings.CUSTOM_PAYLOAD_KEY, it)
-                                        settings.setLastConfigIsPredefined(false)
-                                        settings.setCustomPayloadEnabled(true)
-                                    }
-                                },
-                                remoteProxyConfig = remoteProxyConfig,
-                                onRemoteProxyClick = { showRemoteProxyDialog = true },
-                                tunnelType = tunnelType,
-                                onTunnelTypeChange = { newType ->
-                                    tunnelType = newType
-                                    val settings = Settings(context)
-                                    settings.setString(Settings.TUNNEL_TYPE_KEY, newType)
-                                    settings.setCustomPayloadEnabled(newType == "SSH_PROXY")
-
-                                    if (newType == "SSH_DIRECT") {
-                                        settings.setString(Settings.REMOTE_PROXY_HOST_KEY, "")
-                                        settings.setString(Settings.REMOTE_PROXY_PORT_KEY, "0")
-                                        remoteProxyConfig = RemoteProxyConfig()
-                                    }
-                                }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        if (connectionStatus != ConnectionStatus.LEVEL_NOT_CONNECTED) {
-                            ConnectionStatsCard(
-                                pingMs = pingMs,
-                                avgUploadKbps = avgUploadKbps,
-                                avgDownloadKbps = avgDownloadKbps,
-                                sshHost = Settings(context).getString(Settings.SSH_HOST_KEY),
-                                payloadName = if (isCustomPayloadEnabled) "Custom" else {
-                                    if (selectedPayload.isNotEmpty()) {
-                                        selectedPayload.split(" ").lastOrNull() ?: selectedPayload
-                                    } else {
-                                        selectedPayload
-                                    }
-                                },
-                                connectionDurationText = uptimeText,
-                                geoIp = geoIp,
-                                geoCity = geoCity,
-                                geoRegion = geoRegion,
-                                geoCountry = geoCountry,
-                                geoOrg = geoOrg,
-                                geoCountryCode = geoCountryCode,
-                                geoStatus = geoStatus,
-                                onConnectionInfoClick = { showConnectionInfoModal = true },
-                                modifier = Modifier
-                                    .align(Alignment.CenterHorizontally)
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                        }
-
-                        Button(
-                            onClick = {
-                                if (connectionStatus == ConnectionStatus.LEVEL_NOT_CONNECTED) {
-                                    val (isValid, errorMessage) = validateTunnelData()
-
-                                    if (isValid) {
-                                        val payloadToUse =
-                                            if (isCustomPayloadEnabled) customPayloadText else selectedPayload
-
-                                        onStartTunnel(payloadToUse, selectedOperator)
-                                        isRunning = true
-                                    }
-                                } else {
-                                    onStopTunnel()
-                                    isRunning = false
-                                }
-                            },
+                        // Fixed top bar
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp),
-                            enabled = connectionStatus != ConnectionStatus.LEVEL_NOT_CONNECTED || validateTunnelData().first,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = when {
-                                    connectionStatus != ConnectionStatus.LEVEL_NOT_CONNECTED -> Color(0xFFB71C1C)
-                                    validateTunnelData().first -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.outline
-                                }
-                            ),
-                            shape = RoundedCornerShape(24.dp)
+                                .padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (connectionStatus == ConnectionStatus.LEVEL_NOT_CONNECTED) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Start",
-                                    modifier = Modifier.size(20.dp)
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                ConnectionStatusBadge(
+                                    status = connectionStatus,
+                                    onClick = { showConnectionStatusModal = true }
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                NetworkTypeBadge(onRequestPhoneStatePermission = onRequestPhoneStatePermission)
                             }
-                            Text(
-                                text = when {
-                                    connectionStatus != ConnectionStatus.LEVEL_NOT_CONNECTED -> "Stop"
-                                    validateTunnelData().first -> "Start"
-                                    else -> "Configure Required"
-                                },
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                            )
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                IconButton(
+                                    onClick = { showSshConfigScreen = true }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = "SSH Configuration",
+                                        tint = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { showSettingsScreen = true }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Settings",
+                                        tint = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
+
+                                MenuDropdown(
+                                    onPresetsClick = { showConfigManagerScreen = true },
+                                    onStatsClick = { showStatsScreen = true },
+                                    onTweaksClick = { showTweaksScreen = true },
+                                    onAboutClick = { showAboutScreen = true },
+                                    onExitClick = {
+                                        android.os.Process.killProcess(android.os.Process.myPid())
+                                    }
+                                )
+                            }
                         }
 
+                        // Scrollable middle content
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState()),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                val rotation by animateFloatAsState(
+                                    targetValue = if (isAnimating) 360f else 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = 0.6f,
+                                        stiffness = 100f
+                                    ),
+                                    label = "rotation"
+                                )
+
+                                val scale by animateFloatAsState(
+                                    targetValue = if (isAnimating) 1.2f else 1f,
+                                    animationSpec = spring(
+                                        dampingRatio = 0.6f,
+                                        stiffness = 100f
+                                    ),
+                                    label = "scale"
+                                )
+
+                                Icon(
+                                    painter = painterResource(id = R.mipmap.ic_launcher_foreground),
+                                    contentDescription = "App Icon",
+                                    modifier = Modifier
+                                        .size(72.dp)
+                                        .clickable(
+                                            indication = null,
+                                            interactionSource = remember { MutableInteractionSource() }
+                                        ) { handleLogoClick() }
+                                        .rotate(rotation)
+                                        .scale(scale),
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "ZeroNet",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                )
+                                Text(
+                                    text = "by netindev",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            if (connectionStatus == ConnectionStatus.LEVEL_NOT_CONNECTED) {
+                                OperatorConfigCard(
+                                    selectedOperator = selectedOperator,
+                                    operators = operators,
+                                    onOperatorSelected = { operator ->
+                                        selectedOperator = operator
+                                        selectedPayload = ""
+                                        val settings = Settings(context)
+                                        settings.setString(Settings.OPERATOR_KEY, operator)
+                                        settings.setString(Settings.PAYLOAD_KEY, "")
+                                        settings.setLastConfigIsPredefined(true)
+                                        isCustomPayloadEnabled = false
+                                    },
+                                    isCustomPayloadEnabled = isCustomPayloadEnabled,
+                                    onCustomPayloadToggle = { enabled ->
+                                        isCustomPayloadEnabled = enabled
+                                        val settings = Settings(context)
+                                        settings.setCustomPayloadEnabled(enabled)
+                                        if (enabled) {
+                                            selectedPayload = ""
+                                            settings.setString(Settings.CUSTOM_PAYLOAD_KEY, customPayloadText)
+                                            settings.setLastConfigIsPredefined(false)
+                                        } else {
+                                            settings.setString(Settings.PAYLOAD_KEY, selectedPayload)
+                                            settings.setLastConfigIsPredefined(true)
+                                        }
+                                    }
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                PayloadConfigCard(
+                                    isCustomPayloadEnabled = isCustomPayloadEnabled,
+                                    selectedPayload = selectedPayload,
+                                    availablePayloads = availablePayloads,
+                                    onPayloadSelected = {
+                                        selectedPayload = it
+                                        val settings = Settings(context)
+                                        settings.setString(Settings.PAYLOAD_KEY, it)
+                                        settings.setLastConfigIsPredefined(true)
+                                    },
+                                    customPayloadText = customPayloadText,
+                                    onCustomPayloadTextChange = {
+                                        customPayloadText = it
+                                        if (isCustomPayloadEnabled) {
+                                            val settings = Settings(context)
+                                            settings.setString(Settings.CUSTOM_PAYLOAD_KEY, it)
+                                            settings.setLastConfigIsPredefined(false)
+                                            settings.setCustomPayloadEnabled(true)
+                                        }
+                                    },
+                                    remoteProxyConfig = remoteProxyConfig,
+                                    onRemoteProxyClick = { showRemoteProxyDialog = true },
+                                    tunnelType = tunnelType,
+                                    onTunnelTypeChange = { newType ->
+                                        tunnelType = newType
+                                        val settings = Settings(context)
+                                        settings.setString(Settings.TUNNEL_TYPE_KEY, newType)
+                                        settings.setCustomPayloadEnabled(newType != "SSH_DIRECT")
+
+                                        if (newType == "SSH_DIRECT") {
+                                            settings.setString(Settings.REMOTE_PROXY_HOST_KEY, "")
+                                            settings.setString(Settings.REMOTE_PROXY_PORT_KEY, "0")
+                                            remoteProxyConfig = RemoteProxyConfig()
+                                        }
+                                    },
+                                    sniHost = sniHost,
+                                    onSniHostChange = { newSni ->
+                                        sniHost = newSni
+                                        val settings = Settings(context)
+                                        settings.setString(Settings.SSL_SNI_HOST_KEY, newSni)
+                                    }
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            if (connectionStatus != ConnectionStatus.LEVEL_NOT_CONNECTED) {
+                                ConnectionStatsCard(
+                                    pingMs = pingMs,
+                                    avgUploadKbps = avgUploadKbps,
+                                    avgDownloadKbps = avgDownloadKbps,
+                                    sshHost = Settings(context).getString(Settings.SSH_HOST_KEY),
+                                    payloadName = if (isCustomPayloadEnabled) "Custom" else {
+                                        if (selectedPayload.isNotEmpty()) {
+                                            selectedPayload.split(" ").lastOrNull() ?: selectedPayload
+                                        } else {
+                                            selectedPayload
+                                        }
+                                    },
+                                    connectionDurationText = uptimeText,
+                                    geoIp = geoIp,
+                                    geoCity = geoCity,
+                                    geoRegion = geoRegion,
+                                    geoCountry = geoCountry,
+                                    geoOrg = geoOrg,
+                                    geoCountryCode = geoCountryCode,
+                                    geoStatus = geoStatus,
+                                    onConnectionInfoClick = { showConnectionInfoModal = true }
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (connectionStatus == ConnectionStatus.LEVEL_NOT_CONNECTED) {
+                                        val (isValid, errorMessage) = validateTunnelData()
+
+                                        if (isValid) {
+                                            val payloadToUse =
+                                                if (isCustomPayloadEnabled) customPayloadText else selectedPayload
+
+                                            onStartTunnel(payloadToUse, selectedOperator)
+                                            isRunning = true
+                                        }
+                                    } else {
+                                        onStopTunnel()
+                                        isRunning = false
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                enabled = connectionStatus != ConnectionStatus.LEVEL_NOT_CONNECTED || validateTunnelData().first,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = when {
+                                        connectionStatus != ConnectionStatus.LEVEL_NOT_CONNECTED -> Color(0xFFB71C1C)
+                                        validateTunnelData().first -> MaterialTheme.colorScheme.primary
+                                        else -> MaterialTheme.colorScheme.outline
+                                    }
+                                ),
+                                shape = RoundedCornerShape(24.dp)
+                            ) {
+                                if (connectionStatus == ConnectionStatus.LEVEL_NOT_CONNECTED) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = "Start",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+                                Text(
+                                    text = when {
+                                        connectionStatus != ConnectionStatus.LEVEL_NOT_CONNECTED -> "Stop"
+                                        validateTunnelData().first -> "Start"
+                                        else -> "Configure Required"
+                                    },
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+
+                        // Fixed bottom log viewer
+                        LogViewer(
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
 
+                    // Dialogs / modals (overlays)
                     RemoteProxyDialog(
                         isVisible = showRemoteProxyDialog,
                         onDismiss = { showRemoteProxyDialog = false },
@@ -800,12 +841,6 @@ fun ZeronetApp(
                         geoCountry = geoCountry,
                         geoOrg = geoOrg,
                         geoCountryCode = geoCountryCode
-                    )
-
-
-                    LogViewer(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
                     )
                 }
             }

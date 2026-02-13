@@ -11,6 +11,9 @@ object ConnectionStatsManager {
         val sshHost: String = "",
         val payloadName: String = "",
         val connectedSinceEpochMs: Long = -1L,
+        val sessionDurationSeconds: Long = 0L,
+        val sessionDownloadBytes: Long = 0L,
+        val sessionUploadBytes: Long = 0L,
         val city: String = "",
         val region: String = "",
         val country: String = "",
@@ -30,6 +33,15 @@ object ConnectionStatsManager {
     @JvmStatic
     fun setSpeeds(avgUploadKbps: Double, avgDownloadKbps: Double) {
         _stats.value = _stats.value.copy(avgUploadKbps = avgUploadKbps, avgDownloadKbps = avgDownloadKbps)
+    }
+
+    @JvmStatic
+    fun setSessionStats(durationSeconds: Long, downloadBytes: Long, uploadBytes: Long) {
+        _stats.value = _stats.value.copy(
+            sessionDurationSeconds = durationSeconds,
+            sessionDownloadBytes = downloadBytes,
+            sessionUploadBytes = uploadBytes
+        )
     }
 
     @JvmStatic
