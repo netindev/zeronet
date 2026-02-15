@@ -12,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -134,7 +136,7 @@ fun AboutScreen(
                 }
 
                 when (selectedTabIndex) {
-                    0 -> AboutContent()
+                    0 -> AboutContent(uriHandler = LocalUriHandler.current)
                     1 -> LicensesContent()
                 }
             }
@@ -143,7 +145,9 @@ fun AboutScreen(
 }
 
 @Composable
-fun AboutContent() {
+fun AboutContent(
+    uriHandler: UriHandler = LocalUriHandler.current
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -165,6 +169,36 @@ fun AboutContent() {
                     text = "A modern VPN client for Android with advanced tunneling capabilities and customizable payloads.",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurface,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+        }
+
+        Card(
+            onClick = { uriHandler.openUri("https://github.com/netindev/zeronet") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "GitHub",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+                Text(
+                    text = "github.com/netindev/zeronet",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                 )
             }

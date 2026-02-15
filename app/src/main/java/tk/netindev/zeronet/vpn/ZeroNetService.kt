@@ -246,14 +246,16 @@ class ZeroNetService : Service() {
         }
 
         val customView = createCustomNotificationView()
+        val (contentTitle, contentText) = getNotificationContentText()
 
         val builder = Notification.Builder(this)
             .setSmallIcon(android.R.drawable.ic_secure)
+            .setContentTitle(contentTitle)
+            .setContentText(contentText)
             .setCustomBigContentView(customView)
             .setOnlyAlertOnce(true)
             .setOngoing(true)
-            .setShowWhen(true)
-            .setUsesChronometer(false)
+            .setShowWhen(false)
             .setAutoCancel(false)
             .setDefaults(0)
             .setContentIntent(getGraphPendingIntent(this))
@@ -301,37 +303,44 @@ class ZeroNetService : Service() {
 
         val status = ConnectionStatusManager.status.value
         val statusText = getStatusText(status)
-        
-        remoteViews.setTextViewText(R.id.notification_title, "ZeroNet")
         remoteViews.setTextViewText(R.id.notification_status, statusText)
 
         val stopIntent = Intent(this, NotificationActionReceiver::class.java).apply {
             action = "tk.netindev.zeronet.vpn.ACTION_SERVICE_STOP"
         }
         val stopPendingIntent = PendingIntent.getBroadcast(
-            this, 0, stopIntent, 
+            this, 0, stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         remoteViews.setOnClickPendingIntent(R.id.stop_vpn_button, stopPendingIntent)
-        
+
         if (status == ConnectionStatus.LEVEL_CONNECTED && this.speedMonitor != null) {
             val avgUp = speedMonitor!!.currentUploadSpeed
             val avgDown = speedMonitor!!.currentDownloadSpeed
             val upStr = String.format(Locale.ENGLISH, "%.1f kbps", avgUp)
             val downStr = String.format(Locale.ENGLISH, "%.1f kbps", avgDown)
-            
             remoteViews.setTextViewText(R.id.upload_speed, upStr)
             remoteViews.setTextViewText(R.id.download_speed, downStr)
-            remoteViews.setTextViewText(R.id.connection_info, "Secure VPN Connection Active")
         } else {
             remoteViews.setTextViewText(R.id.upload_speed, "-- kbps")
             remoteViews.setTextViewText(R.id.download_speed, "-- kbps")
-            remoteViews.setTextViewText(R.id.connection_info, getConnectionInfoText(status))
         }
-        
+
         return remoteViews
     }
     
+    private fun getNotificationContentText(): Pair<String, String> {
+        val status = ConnectionStatusManager.status.value
+        val statusStr = getStatusText(status)
+        return if (status == ConnectionStatus.LEVEL_CONNECTED && speedMonitor != null) {
+            val down = String.format(Locale.ENGLISH, "%.1f", speedMonitor!!.currentDownloadSpeed)
+            val up = String.format(Locale.ENGLISH, "%.1f", speedMonitor!!.currentUploadSpeed)
+            "ZeroNet" to "$statusStr · ↓ $down ↑ $up kbps"
+        } else {
+            "ZeroNet" to statusStr
+        }
+    }
+
     private fun getStatusText(status: ConnectionStatus): String {
         return when (status) {
             ConnectionStatus.LEVEL_CONNECTED -> "Connected"
@@ -353,46 +362,6 @@ class ZeroNetService : Service() {
         }
     }
     
-    private fun getStatusColor(status: ConnectionStatus): Int {
-        return when (status) {
-            ConnectionStatus.LEVEL_CONNECTED -> 0xFF4CAF50.toInt()
-            ConnectionStatus.LEVEL_CONNECTING_NO_SERVER_REPLY_YET,
-            ConnectionStatus.LEVEL_CONNECTING_SERVER_REPLIED,
-            ConnectionStatus.LEVEL_CONNECTING_DNS,
-            ConnectionStatus.LEVEL_CONNECTING_SSH,
-            ConnectionStatus.LEVEL_AUTHENTICATING,
-            ConnectionStatus.LEVEL_TUNNEL_SETUP,
-            ConnectionStatus.LEVEL_START -> 0xFF2196F3.toInt()
-            ConnectionStatus.LEVEL_AUTH_FAILED,
-            ConnectionStatus.LEVEL_TIMEOUT,
-            ConnectionStatus.LEVEL_PROXY_ERROR -> 0xFFF44336.toInt()
-            ConnectionStatus.LEVEL_NOT_CONNECTED -> 0xFF757575.toInt()
-            else -> 0xFF9C27B0.toInt()
-        }
-    }
-    
-    private fun getConnectionInfoText(status: ConnectionStatus): String {
-        return when (status) {
-            ConnectionStatus.LEVEL_CONNECTED -> "Secure VPN Connection Active"
-            ConnectionStatus.LEVEL_START -> "Initializing connection..."
-            ConnectionStatus.LEVEL_CONNECTING_NO_SERVER_REPLY_YET -> "Connecting to server..."
-            ConnectionStatus.LEVEL_CONNECTING_SERVER_REPLIED -> "Server handshake..."
-            ConnectionStatus.LEVEL_CONNECTING_DNS -> "Resolving DNS..."
-            ConnectionStatus.LEVEL_CONNECTING_SSH -> "Establishing SSH..."
-            ConnectionStatus.LEVEL_AUTHENTICATING -> "Authenticating..."
-            ConnectionStatus.LEVEL_TUNNEL_SETUP -> "Setting up tunnel..."
-            ConnectionStatus.LEVEL_RECONNECTING -> "Reconnecting..."
-            ConnectionStatus.LEVEL_DISCONNECTING -> "Disconnecting..."
-            ConnectionStatus.LEVEL_AUTH_FAILED -> "Authentication failed"
-            ConnectionStatus.LEVEL_NO_NETWORK -> "No network connection"
-            ConnectionStatus.LEVEL_TIMEOUT -> "Connection timeout"
-            ConnectionStatus.LEVEL_PROXY_ERROR -> "Proxy error"
-            ConnectionStatus.LEVEL_NOT_CONNECTED -> "VPN disconnected"
-            ConnectionStatus.UNKNOWN_LEVEL -> "Unknown status"
-        }
-    }
-
-
     private fun updateNotificationWithStats() {
         val channel = this.lastChannel ?: ZERONET_NOTIFICATION_CHANNEL_STATUS
         showNotification(null, channel, 0)
