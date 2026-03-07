@@ -23,6 +23,7 @@ fun extractBadges(payloadName: String): List<String> {
     val badges = mutableListOf<String>()
     val upperName = payloadName.uppercase()
     
+    if (upperName.contains("DNSTT")) badges.add("DNSTT")
     if (upperName.contains("WS")) badges.add("WS")
     if (upperName.contains("ZERO-RATED")) badges.add("ZERO-RATED")
     if (upperName.contains("ROTATE")) badges.add("ROTATE")
@@ -37,13 +38,15 @@ fun getLastWord(payloadName: String): String {
 @Composable
 fun PayloadBadge(text: String) {
     val backgroundColor = when (text) {
-        "WS" -> Color(0xFF4CAF50) // Verde
-        "ZERO-RATED" -> Color(0xFF2196F3) // Azul
-        "ROTATE" -> Color(0xFFFF9800) // Laranja
+        "DNSTT" -> Color(0xFFB71C1C)
+        "WS" -> Color(0xFF4CAF50)
+        "ZERO-RATED" -> Color(0xFF2196F3)
+        "ROTATE" -> Color(0xFFFF9800)
         else -> MaterialTheme.colorScheme.primaryContainer
     }
     
     val textColor = when (text) {
+        "DNSTT" -> Color.White
         "WS" -> Color.White
         "ZERO-RATED" -> Color.White
         "ROTATE" -> Color.White

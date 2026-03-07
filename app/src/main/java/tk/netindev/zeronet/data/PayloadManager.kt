@@ -5,7 +5,10 @@ data class PayloadItem(
     val payloadString: String,
     val proxyHost: String = "",
     val proxyPort: Int = 0,
-    val tunnelType: String = "SSH_PROXY"
+    val tunnelType: String = "SSH_PROXY",
+    val dnsttDnsServer: String = "",
+    val dnsttTunnelDomain: String = "",
+    val dnsttPublicKey: String = ""
 )
 
 data class RemoteProxyConfig(
@@ -17,6 +20,7 @@ object PayloadManager {
 
     private val TIM_PAYLOADS = listOf(
         PayloadItem("WS ZERO-RATED bancah.com.br", "CONNECT /-cgi/trace HTTP/1.1[lf]Host: bancah.com.br[crlf][crlf][split][crlf]GET- / HTTP/1.1[crlf]Host: [host][crlf]Upgrade: Websocket[crlf][crlf]", "bancah.com.br", 80, "SSH_PROXY"),
+        PayloadItem("DNSTT d.dr2.site", "", tunnelType = "DNSTT", dnsttDnsServer = "189.40.198.81", dnsttTunnelDomain = "d.dr2.site", dnsttPublicKey = "57b02625a2982f11a073f89a3ac676d81f70e17eea09eed143a7b7dac675d768"),
     )
 
     private val CLARO_PAYLOADS = listOf(

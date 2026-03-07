@@ -703,14 +703,31 @@ fun ZeronetApp(
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 PayloadConfigCard(
-                                    isCustomPayloadEnabled = isCustomPayloadEnabled || tunnelType == "DNSTT",
+                                    isCustomPayloadEnabled = isCustomPayloadEnabled,
                                     selectedPayload = selectedPayload,
                                     availablePayloads = availablePayloads,
-                                    onPayloadSelected = {
-                                        selectedPayload = it
+                                    onPayloadSelected = { payloadName ->
+                                        selectedPayload = payloadName
                                         val settings = Settings(context)
-                                        settings.setString(Settings.PAYLOAD_KEY, it)
+                                        settings.setString(Settings.PAYLOAD_KEY, payloadName)
                                         settings.setLastConfigIsPredefined(true)
+
+                                        val payloadItem = PayloadManager.getPayloadItem(selectedOperator, payloadName)
+                                        if (payloadItem != null && payloadItem.tunnelType == "DNSTT") {
+                                            tunnelType = "DNSTT"
+                                            settings.setString(Settings.TUNNEL_TYPE_KEY, "DNSTT")
+                                            dnsttDnsServer = payloadItem.dnsttDnsServer
+                                            dnsttTunnelDomain = payloadItem.dnsttTunnelDomain
+                                            dnsttPublicKey = payloadItem.dnsttPublicKey
+                                            settings.setDnsttConfig(Settings.DnsttConfig(
+                                                dnsServer = payloadItem.dnsttDnsServer,
+                                                tunnelDomain = payloadItem.dnsttTunnelDomain,
+                                                publicKey = payloadItem.dnsttPublicKey
+                                            ))
+                                        } else if (payloadItem != null) {
+                                            tunnelType = payloadItem.tunnelType
+                                            settings.setString(Settings.TUNNEL_TYPE_KEY, payloadItem.tunnelType)
+                                        }
                                     },
                                     customPayloadText = customPayloadText,
                                     onCustomPayloadTextChange = {
@@ -729,13 +746,9 @@ fun ZeronetApp(
                                         tunnelType = newType
                                         val settings = Settings(context)
                                         settings.setString(Settings.TUNNEL_TYPE_KEY, newType)
-                                        if (newType == "DNSTT") {
-                                            settings.setCustomPayloadEnabled(true)
-                                        } else {
-                                            settings.setCustomPayloadEnabled(newType != "SSH_DIRECT")
-                                        }
+                                        settings.setCustomPayloadEnabled(newType != "SSH_DIRECT" && newType != "DNSTT")
 
-                                        if (newType == "SSH_DIRECT") {
+                                        if (newType == "SSH_DIRECT" || newType == "DNSTT") {
                                             settings.setString(Settings.REMOTE_PROXY_HOST_KEY, "")
                                             settings.setString(Settings.REMOTE_PROXY_PORT_KEY, "0")
                                             remoteProxyConfig = RemoteProxyConfig()
