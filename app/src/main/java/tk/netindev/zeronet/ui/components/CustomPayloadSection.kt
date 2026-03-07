@@ -54,30 +54,32 @@ fun CustomPayloadSection(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Custom Payload",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontFamily = FontFamily.Monospace
-            )
-
-            OutlinedTextField(
-                value = customPayloadText,
-                onValueChange = onCustomPayloadTextChange,
-                placeholder = { Text("Enter custom payload...") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp),
-                textStyle = androidx.compose.ui.text.TextStyle(
+            if (tunnelType != "DNSTT") {
+                Text(
+                    text = "Custom Payload",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontFamily = FontFamily.Monospace
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary
-                ),
-                maxLines = 4
-            )
+                )
+
+                OutlinedTextField(
+                    value = customPayloadText,
+                    onValueChange = onCustomPayloadTextChange,
+                    placeholder = { Text("Enter custom payload...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary
+                    ),
+                    maxLines = 4
+                )
+            }
 
             // Tunnel type selector
             Text(

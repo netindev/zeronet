@@ -143,16 +143,18 @@ fun PayloadDropdown(
                     )
                 )
                 
-                ExposedDropdownMenu(
+                DropdownMenu(
                     expanded = payloadExpanded,
                     onDismissRequest = { payloadExpanded = false },
                     modifier = Modifier
+                        .exposedDropdownSize()
+                        .heightIn(max = 200.dp)
                         .background(MaterialTheme.colorScheme.surface)
                         .clip(RoundedCornerShape(12.dp))
                 ) {
                     availablePayloads.forEach { payloadItem ->
                         DropdownMenuItem(
-                            text = { 
+                            text = {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
@@ -173,7 +175,7 @@ fun PayloadDropdown(
                                     }
                                 }
                             },
-                            onClick = { 
+                            onClick = {
                                 onPayloadSelected(payloadItem.payloadName)
                                 payloadExpanded = false
                             }

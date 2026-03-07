@@ -54,6 +54,8 @@ class Settings(context: Context) {
         const val MNO_FREE_INTERNET_PORT_KEY = "mnoFreeInternetPort"
         const val MNO_FREE_INTERNET_PHONE_KEY = "mnoFreeInternetPhone"
         const val MNO_FREE_INTERNET_API_KEY = "mnoFreeInternetApiKey"
+
+        const val DNSTT_WARNING_DISMISSED_KEY = "dnsttWarningDismissed"
     }
     
     private val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)

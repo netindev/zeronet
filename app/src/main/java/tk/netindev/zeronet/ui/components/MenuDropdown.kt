@@ -6,9 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Analytics
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,7 +18,6 @@ import androidx.compose.ui.unit.dp
 fun MenuDropdown(
     onPresetsClick: () -> Unit,
     onStatsClick: () -> Unit,
-    onTweaksClick: () -> Unit,
     onAboutClick: () -> Unit,
     onExitClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -33,7 +30,7 @@ fun MenuDropdown(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.List,
-                contentDescription = "Presets Menu",
+                contentDescription = "Menu",
                 tint = MaterialTheme.colorScheme.onBackground
             )
         }
@@ -88,30 +85,6 @@ fun MenuDropdown(
                 onClick = {
                     expanded = false
                     onStatsClick()
-                }
-            )
-            
-            DropdownMenuItem(
-                text = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "Tweaks",
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                },
-                onClick = {
-                    expanded = false
-                    onTweaksClick()
                 }
             )
             

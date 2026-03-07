@@ -20,7 +20,7 @@ import tk.netindev.zeronet.service.util.AppLog.w
 import tk.netindev.zeronet.service.util.ConnectionStatus
 import tk.netindev.zeronet.service.util.ConnectionStatusManager.setStatus
 import tk.netindev.zeronet.vpn.ZeroNetService
-import tk.netindev.zeronet.vpn.methods.Socks5ProxyData
+
 import tk.netindev.zeronet.vpn.tunnel.TunnelState.Companion.tunnelState
 import tk.netindev.zeronet.vpn.util.NetworkUtils
 import java.io.File
@@ -186,69 +186,23 @@ class DnsttTunnelManager(context: Context) : Runnable, ConnectionMonitor {
 
         setStatus(ConnectionStatus.LEVEL_CONNECTING_SSH)
 
-        // Try SOCKS5 proxy first, then fall back to direct connection
-        var sshConnected = false
+        i(TAG, "SSH directly to 127.0.0.1:$dnsttPort (raw tunnel)")
+        sshConnection = Connection("127.0.0.1", dnsttPort)
+        if (settings.getIsDisabledDelaySSH()) {
+            sshConnection!!.setTCPNoDelay(true)
+        }
 
-        // Attempt 1: SSH through DNSTT SOCKS5 proxy
-        i(TAG, "Attempt 1: SSH to $sshHost:$sshPort via DNSTT SOCKS5 proxy")
+        connecting = true
         try {
-            sshConnection = Connection(sshHost, sshPort)
-            if (settings.getIsDisabledDelaySSH()) {
-                sshConnection!!.setTCPNoDelay(true)
-            }
-            sshConnection!!.setProxyData(Socks5ProxyData("127.0.0.1", dnsttPort))
-
-            connecting = true
-            try {
-                sshConnection!!.connect(
-                    { _, _, _, _ -> true },
-                    30 * 1000,
-                    60 * 1000
-                )
-            } finally {
-                connecting = false
-            }
-            sshConnected = true
-            i(TAG, "SSH connected via SOCKS5 proxy")
-        } catch (ex: Exception) {
-            w(TAG, "SOCKS5 proxy SSH failed: ${ex.message}")
-            Log.w(TAG, "SOCKS5 SSH error details:", ex)
-            sshConnection?.close()
-            sshConnection = null
+            sshConnection!!.connect(
+                { _, _, _, _ -> true },
+                30 * 1000,
+                60 * 1000
+            )
+        } finally {
+            connecting = false
         }
-
-        // Attempt 2: SSH directly to DNSTT port (raw TCP tunnel)
-        if (!sshConnected) {
-            i(TAG, "Attempt 2: SSH directly to 127.0.0.1:$dnsttPort (raw tunnel)")
-            try {
-                sshConnection = Connection("127.0.0.1", dnsttPort)
-                if (settings.getIsDisabledDelaySSH()) {
-                    sshConnection!!.setTCPNoDelay(true)
-                }
-
-                connecting = true
-                try {
-                    sshConnection!!.connect(
-                        { _, _, _, _ -> true },
-                        30 * 1000,
-                        60 * 1000
-                    )
-                } finally {
-                    connecting = false
-                }
-                sshConnected = true
-                i(TAG, "SSH connected via direct tunnel")
-            } catch (ex: Exception) {
-                w(TAG, "Direct tunnel SSH failed: ${ex.message}")
-                Log.w(TAG, "Direct SSH error details:", ex)
-                sshConnection?.close()
-                sshConnection = null
-            }
-        }
-
-        if (!sshConnected || sshConnection == null) {
-            throw Exception("SSH connection failed through both SOCKS5 and direct tunnel")
-        }
+        i(TAG, "SSH connected via direct tunnel")
 
         sshConnection!!.addConnectionMonitor(this)
 
