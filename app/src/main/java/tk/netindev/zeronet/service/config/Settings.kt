@@ -44,6 +44,11 @@ class Settings(context: Context) {
         const val SSL_SNI_HOST_KEY = "sslSniHost"
         const val SSL_PORT_KEY = "sslPort"
 
+        const val DNSTT_DNS_SERVER_KEY = "dnsttDnsServer"
+        const val DNSTT_TUNNEL_DOMAIN_KEY = "dnsttTunnelDomain"
+        const val DNSTT_PUBLIC_KEY_KEY = "dnsttPublicKey"
+        const val DNSTT_PROXY_PORT_KEY = "dnsttProxyPort"
+
         const val MNO_FREE_INTERNET_OPERATOR_KEY = "mnoFreeInternetOperator"
         const val MNO_FREE_INTERNET_HOST_KEY = "mnoFreeInternetHost"
         const val MNO_FREE_INTERNET_PORT_KEY = "mnoFreeInternetPort"
@@ -70,6 +75,10 @@ class Settings(context: Context) {
             LAST_CONFIG_IS_PREDEFINED_KEY -> "true"
             SSL_SNI_HOST_KEY -> ""
             SSL_PORT_KEY -> "443"
+            DNSTT_DNS_SERVER_KEY -> "8.8.8.8"
+            DNSTT_TUNNEL_DOMAIN_KEY -> ""
+            DNSTT_PUBLIC_KEY_KEY -> ""
+            DNSTT_PROXY_PORT_KEY -> "7000"
             MNO_FREE_INTERNET_OPERATOR_KEY -> "TIM"
             MNO_FREE_INTERNET_HOST_KEY -> ""
             MNO_FREE_INTERNET_PORT_KEY -> "8080"
@@ -296,6 +305,29 @@ class Settings(context: Context) {
     fun setLastConfigIsPredefined(isPredefined: Boolean) {
         setString(LAST_CONFIG_IS_PREDEFINED_KEY, isPredefined.toString())
     }
+
+    fun getDnsttConfig(): DnsttConfig {
+        return DnsttConfig(
+            dnsServer = getString(DNSTT_DNS_SERVER_KEY),
+            tunnelDomain = getString(DNSTT_TUNNEL_DOMAIN_KEY),
+            publicKey = getString(DNSTT_PUBLIC_KEY_KEY),
+            proxyPort = getString(DNSTT_PROXY_PORT_KEY).toIntOrNull() ?: 7000
+        )
+    }
+
+    fun setDnsttConfig(config: DnsttConfig) {
+        setString(DNSTT_DNS_SERVER_KEY, config.dnsServer)
+        setString(DNSTT_TUNNEL_DOMAIN_KEY, config.tunnelDomain)
+        setString(DNSTT_PUBLIC_KEY_KEY, config.publicKey)
+        setString(DNSTT_PROXY_PORT_KEY, config.proxyPort.toString())
+    }
+
+    data class DnsttConfig(
+        val dnsServer: String = "8.8.8.8",
+        val tunnelDomain: String = "",
+        val publicKey: String = "",
+        val proxyPort: Int = 7000
+    )
 
     data class SshConfig(
         val host: String,

@@ -25,6 +25,12 @@ fun PayloadConfigCard(
     onTunnelTypeChange: (String) -> Unit,
     sniHost: String = "",
     onSniHostChange: (String) -> Unit = {},
+    dnsttDnsServer: String = "",
+    onDnsttDnsServerChange: (String) -> Unit = {},
+    dnsttTunnelDomain: String = "",
+    onDnsttTunnelDomainChange: (String) -> Unit = {},
+    dnsttPublicKey: String = "",
+    onDnsttPublicKeyChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -54,7 +60,13 @@ fun PayloadConfigCard(
                 tunnelType = tunnelType,
                 onTunnelTypeChange = onTunnelTypeChange,
                 sniHost = sniHost,
-                onSniHostChange = onSniHostChange
+                onSniHostChange = onSniHostChange,
+                dnsttDnsServer = dnsttDnsServer,
+                onDnsttDnsServerChange = onDnsttDnsServerChange,
+                dnsttTunnelDomain = dnsttTunnelDomain,
+                onDnsttTunnelDomainChange = onDnsttTunnelDomainChange,
+                dnsttPublicKey = dnsttPublicKey,
+                onDnsttPublicKeyChange = onDnsttPublicKeyChange
             )
         }
     }

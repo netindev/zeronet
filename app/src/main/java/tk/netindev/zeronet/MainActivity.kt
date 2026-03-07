@@ -231,6 +231,9 @@ fun ZeronetApp(
     var showConnectionInfoModal by remember { mutableStateOf(false) }
     var tunnelType by remember { mutableStateOf("SSH_DIRECT") }
     var sniHost by remember { mutableStateOf("") }
+    var dnsttDnsServer by remember { mutableStateOf("8.8.8.8") }
+    var dnsttTunnelDomain by remember { mutableStateOf("") }
+    var dnsttPublicKey by remember { mutableStateOf("") }
 
     var avgUploadKbps by remember { mutableStateOf(0.0) }
     var avgDownloadKbps by remember { mutableStateOf(0.0) }
@@ -333,11 +336,17 @@ fun ZeronetApp(
 
         val savedTunnelType = settings.getString(Settings.TUNNEL_TYPE_KEY, "SSH_DIRECT")
         tunnelType = when (savedTunnelType) {
+            "DNSTT" -> "DNSTT"
             "SSH_SSL_TUNNEL" -> "SSH_SSL_TUNNEL"
             "SSH_PROXY" -> if (hasProxyConfigured) "SSH_PROXY" else "SSH_DIRECT"
             else -> if (hasProxyConfigured) "SSH_PROXY" else "SSH_DIRECT"
         }
         sniHost = settings.getString(Settings.SSL_SNI_HOST_KEY, "")
+
+        val dnsttConfig = settings.getDnsttConfig()
+        dnsttDnsServer = dnsttConfig.dnsServer
+        dnsttTunnelDomain = dnsttConfig.tunnelDomain
+        dnsttPublicKey = dnsttConfig.publicKey
 
         if (savedTunnelType != tunnelType) {
             settings.setString(Settings.TUNNEL_TYPE_KEY, tunnelType)
@@ -415,6 +424,19 @@ fun ZeronetApp(
     
 
     fun validateTunnelData(): Pair<Boolean, String> {
+        if (tunnelType == "DNSTT") {
+            if (dnsttTunnelDomain.isBlank()) {
+                return Pair(false, "DNSTT tunnel domain is required.")
+            }
+            if (dnsttPublicKey.isBlank()) {
+                return Pair(false, "DNSTT public key is required.")
+            }
+            if (!sshConfigValid) {
+                return Pair(false, "SSH configuration is required for DNSTT mode.")
+            }
+            return Pair(true, "DNSTT + SSH configuration is valid.")
+        }
+
         if (!sshConfigValid) {
             return Pair(
                 false,
@@ -681,7 +703,7 @@ fun ZeronetApp(
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 PayloadConfigCard(
-                                    isCustomPayloadEnabled = isCustomPayloadEnabled,
+                                    isCustomPayloadEnabled = isCustomPayloadEnabled || tunnelType == "DNSTT",
                                     selectedPayload = selectedPayload,
                                     availablePayloads = availablePayloads,
                                     onPayloadSelected = {
@@ -707,7 +729,11 @@ fun ZeronetApp(
                                         tunnelType = newType
                                         val settings = Settings(context)
                                         settings.setString(Settings.TUNNEL_TYPE_KEY, newType)
-                                        settings.setCustomPayloadEnabled(newType != "SSH_DIRECT")
+                                        if (newType == "DNSTT") {
+                                            settings.setCustomPayloadEnabled(true)
+                                        } else {
+                                            settings.setCustomPayloadEnabled(newType != "SSH_DIRECT")
+                                        }
 
                                         if (newType == "SSH_DIRECT") {
                                             settings.setString(Settings.REMOTE_PROXY_HOST_KEY, "")
@@ -720,6 +746,24 @@ fun ZeronetApp(
                                         sniHost = newSni
                                         val settings = Settings(context)
                                         settings.setString(Settings.SSL_SNI_HOST_KEY, newSni)
+                                    },
+                                    dnsttDnsServer = dnsttDnsServer,
+                                    onDnsttDnsServerChange = { newVal ->
+                                        dnsttDnsServer = newVal
+                                        val settings = Settings(context)
+                                        settings.setString(Settings.DNSTT_DNS_SERVER_KEY, newVal)
+                                    },
+                                    dnsttTunnelDomain = dnsttTunnelDomain,
+                                    onDnsttTunnelDomainChange = { newVal ->
+                                        dnsttTunnelDomain = newVal
+                                        val settings = Settings(context)
+                                        settings.setString(Settings.DNSTT_TUNNEL_DOMAIN_KEY, newVal)
+                                    },
+                                    dnsttPublicKey = dnsttPublicKey,
+                                    onDnsttPublicKeyChange = { newVal ->
+                                        dnsttPublicKey = newVal
+                                        val settings = Settings(context)
+                                        settings.setString(Settings.DNSTT_PUBLIC_KEY_KEY, newVal)
                                     }
                                 )
                             }

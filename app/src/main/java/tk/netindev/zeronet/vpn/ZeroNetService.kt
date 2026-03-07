@@ -35,6 +35,7 @@ import tk.netindev.zeronet.service.util.ConnectionStatusManager
 import tk.netindev.zeronet.service.util.ConnectionStatsManager
 import tk.netindev.zeronet.service.util.ConnectionStatusManager.setStatus
 import tk.netindev.zeronet.service.util.SpeedMonitor
+import tk.netindev.zeronet.vpn.tunnel.DnsttTunnelManager
 import tk.netindev.zeronet.vpn.tunnel.TunnelManagerThread
 import java.lang.reflect.InvocationTargetException
 import java.util.Locale
@@ -48,6 +49,7 @@ class ZeroNetService : Service() {
     private var handler: Handler? = null
     private var tunnelThread: Thread? = null
     private var tunnelManager: TunnelManagerThread? = null
+    private var dnsttTunnelManager: DnsttTunnelManager? = null
     private var connectivityManager: ConnectivityManager? = null
 
     private var speedMonitor: SpeedMonitor? = null
@@ -160,27 +162,58 @@ class ZeroNetService : Service() {
 
     @Synchronized
     fun startTunnel() {
-        i(TAG, "Starting SSH tunnel")
-        setStatus(ConnectionStatus.LEVEL_CONNECTING_NO_SERVER_REPLY_YET)
-        try {
-            this.tunnelManager = TunnelManagerThread(this)
-            this.tunnelManager!!.setOnStopClientListener(object : TunnelManagerThread.StopClientCallback {
-                override fun onStop() {
-                    this@ZeroNetService.endTunnelService()
-                }
-            })
-            this.tunnelThread = Thread(tunnelManager)
-            this.tunnelThread!!.start()
-        } catch (e: Exception) {
-            e(TAG, "Failed to start tunnel", e)
-            setStatus(ConnectionStatus.LEVEL_AUTH_FAILED)
-            this.endTunnelService()
+        val settings = Settings(this)
+        val tunnelType = settings.getTunnelConfig().tunnelType
+
+        if (tunnelType == "DNSTT") {
+            i(TAG, "Starting DNSTT tunnel")
+            setStatus(ConnectionStatus.LEVEL_CONNECTING_NO_SERVER_REPLY_YET)
+            try {
+                val dnsttManager = DnsttTunnelManager(this)
+                dnsttManager.setOnStopClientListener(object : TunnelManagerThread.StopClientCallback {
+                    override fun onStop() {
+                        this@ZeroNetService.endTunnelService()
+                    }
+                })
+                this.dnsttTunnelManager = dnsttManager
+                this.tunnelThread = Thread(dnsttManager)
+                this.tunnelThread!!.start()
+            } catch (e: Exception) {
+                e(TAG, "Failed to start DNSTT tunnel", e)
+                setStatus(ConnectionStatus.LEVEL_AUTH_FAILED)
+                this.endTunnelService()
+            }
+        } else {
+            i(TAG, "Starting SSH tunnel")
+            setStatus(ConnectionStatus.LEVEL_CONNECTING_NO_SERVER_REPLY_YET)
+            try {
+                this.tunnelManager = TunnelManagerThread(this)
+                this.tunnelManager!!.setOnStopClientListener(object : TunnelManagerThread.StopClientCallback {
+                    override fun onStop() {
+                        this@ZeroNetService.endTunnelService()
+                    }
+                })
+                this.tunnelThread = Thread(tunnelManager)
+                this.tunnelThread!!.start()
+            } catch (e: Exception) {
+                e(TAG, "Failed to start tunnel", e)
+                setStatus(ConnectionStatus.LEVEL_AUTH_FAILED)
+                this.endTunnelService()
+            }
         }
     }
 
     @Synchronized
     fun stopTunnel() {
-        if (this.tunnelManager != null) {
+        if (this.dnsttTunnelManager != null) {
+            this.dnsttTunnelManager!!.stopAll()
+            setStatus(ConnectionStatus.LEVEL_NOT_CONNECTED)
+            if (this.tunnelThread != null) {
+                this.tunnelThread!!.interrupt()
+                i(TAG, "DNSTT tunnel thread stopped")
+            }
+            dnsttTunnelManager = null
+        } else if (this.tunnelManager != null) {
             this.tunnelManager!!.stopAll()
             setStatus(ConnectionStatus.LEVEL_NOT_CONNECTED)
             if (this.tunnelThread != null) {

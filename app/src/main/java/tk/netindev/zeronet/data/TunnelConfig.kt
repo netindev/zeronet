@@ -98,5 +98,6 @@ data class TunnelConfig(
 enum class TunnelType {
     SSH_DIRECT,
     SSH_PROXY,
-    SSH_SSL_TUNNEL
+    SSH_SSL_TUNNEL,
+    DNSTT
 }

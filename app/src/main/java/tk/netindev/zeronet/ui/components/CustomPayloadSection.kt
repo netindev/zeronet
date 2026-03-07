@@ -32,6 +32,12 @@ fun CustomPayloadSection(
     onTunnelTypeChange: (String) -> Unit,
     sniHost: String,
     onSniHostChange: (String) -> Unit,
+    dnsttDnsServer: String = "",
+    onDnsttDnsServerChange: (String) -> Unit = {},
+    dnsttTunnelDomain: String = "",
+    onDnsttTunnelDomainChange: (String) -> Unit = {},
+    dnsttPublicKey: String = "",
+    onDnsttPublicKeyChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     AnimatedVisibility(
@@ -84,8 +90,9 @@ fun CustomPayloadSection(
 
             val tunnelOptions = listOf(
                 "SSH_DIRECT" to "Direct",
-                "SSH_PROXY" to "HTTP Proxy",
-                "SSH_SSL_TUNNEL" to "SSL/TLS"
+                "SSH_PROXY" to "HTTP",
+                "SSH_SSL_TUNNEL" to "SSL/TLS",
+                "DNSTT" to "DNSTT"
             )
             val selectedIndex = tunnelOptions.indexOfFirst { it.first == tunnelType }.coerceAtLeast(0)
 
@@ -181,6 +188,89 @@ fun CustomPayloadSection(
                             unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                             focusedBorderColor = MaterialTheme.colorScheme.primary
                         )
+                    )
+                }
+            }
+
+            // DNSTT configuration (only for DNSTT mode)
+            AnimatedVisibility(
+                visible = tunnelType == "DNSTT",
+                enter = fadeIn(animationSpec = tween(200)),
+                exit = fadeOut(animationSpec = tween(150))
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "DNS Server",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    OutlinedTextField(
+                        value = dnsttDnsServer,
+                        onValueChange = onDnsttDnsServerChange,
+                        placeholder = { Text("8.8.8.8") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+
+                    Text(
+                        text = "Tunnel Domain",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    OutlinedTextField(
+                        value = dnsttTunnelDomain,
+                        onValueChange = onDnsttTunnelDomainChange,
+                        placeholder = { Text("tunnel.example.com") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+
+                    Text(
+                        text = "Public Key",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontFamily = FontFamily.Monospace
+                    )
+
+                    OutlinedTextField(
+                        value = dnsttPublicKey,
+                        onValueChange = onDnsttPublicKeyChange,
+                        placeholder = { Text("DNSTT server public key") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary
+                        ),
+                        maxLines = 3
                     )
                 }
             }
